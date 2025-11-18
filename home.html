@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BloxGO - Inicio</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+    <link rel="stylesheet" href="styles/home.css">
+    <style>
+        /* [ESTILOS CSS OMITIDOS POR BREVIDADE] */
+        .character-editor-container { display: flex; gap: 20px; background-color: #2b2b2b; color: white; padding: 15px; border-radius: 8px; height: 350px; margin-bottom: 30px; align-items: center; }
+        #characterPreview { width: 250px; height: 100%; border: 1px solid #555; background-color: #1e1e1e; border-radius: 4px; }
+        .customization-controls { flex-grow: 1; }
+        .color-control-group { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; }
+        .games-category-section { padding: 20px 0; border-bottom: 2px solid #ccc; margin-bottom: 30px; }
+        .games-category-section h1 { color: black; padding-bottom: 10px; font-size: 1.5em; }
+        .games-list-container { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 15px; justify-content: flex-start; }
+        .game-card { display: block; width: 280px; height: 150px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; text-decoration: none; color: black; background-color: white; box-shadow: 1px 1px 3px rgba(0,0,0,0.05); transition: all 0.2s; overflow: hidden; }
+        .game-card:hover { background-color: #eef; transform: translateY(-2px); box-shadow: 2px 4px 8px rgba(0,0,0,0.2); }
+        .game-card h3 { color: #007acc; margin-bottom: 5px; font-size: 1.1em; }
+        .game-card p { font-size: 12px; color: #555; margin: 3px 0; }
+        .play-link { font-weight: bold; color: green; margin-top: 10px; display: block; }
+        .no-games-message { color: gray; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="barrar">
+        <h1 class="title">BLOXGO!</h1>
+        <p class="home">Home</p>
+        <p class="places">Todos os Jogos</p>
+        <a href="fórum.html" class="foruma">
+            <p class="forum">Forúm</p>
+        </a>
+        <div class="barrap">
+            <input class="inputp" id="searchInput" type="text" placeholder="Pesquise algum jogo...">
+            <button class="pesquisar" id="searchButton">Pesquisar</button>
+        </div>
+    </div>
+    <div class="divpai">
+        
+        <div class="character-editor-container">
+            <canvas id="characterPreview"></canvas>
+
+            <div class="customization-controls">
+                <h2>👤 Editar Skin (Roblox Style)</h2>
+                
+                <div class="color-control-group"><label for="headColor">Cabeça</label><input type="color" id="headColor" data-part="Head" value="#ffcc99"></div>
+                <div class="color-control-group"><label for="torsoColor">Tronco</label><input type="color" id="torsoColor" data-part="Torso" value="#007acc"></div>
+                <div class="color-control-group"><label for="leftArmColor">Braço Esquerdo</label><input type="color" id="leftArmColor" data-part="Left Arm" value="#ffcc99"></div>
+                <div class="color-control-group"><label for="rightArmColor">Braço Direito</label><input type="color" id="rightArmColor" data-part="Right Arm" value="#ffcc99"></div>
+                <div class="color-control-group"><label for="leftLegColor">Perna Esquerda</label><input type="color" id="leftLegColor" data-part="Left Leg" value="#1e1e1e"></div>
+                <div class="color-control-group"><label for="rightLegColor">Perna Direita</label><input type="color" id="rightLegColor" data-part="Right Leg" value="#1e1e1e"></div>
+                
+                <p id="skinStatus" style="font-size: 12px; margin-top: 15px; color: #4CAF50;">Skin salva!</p>
+            </div>
+        </div>
+        
+        <div class="games-category-section" id="section-destaques">
+            <h1>🔥 Em Destaques</h1>
+            <div class="games-list-container" id="list-destaques">
+                <p class="no-games-message">Nenhum jogo em destaque.</p>
+            </div>
+        </div>
+
+        <div class="games-category-section" id="section-recomendacoes">
+            <h1>👍 Recomendações para você</h1>
+            <div class="games-list-container" id="list-recomendacoes">
+                <p class="no-games-message">Nenhuma recomendação por enquanto.</p>
+            </div>
+        </div>
+        
+        <div class="games-category-section" id="section-recentes">
+            <h1>⏱️ Jogos Recentes (Todos os Jogos)</h1>
+            <div class="games-list-container" id="list-recentes">
+                <p class="no-games-message">Nenhum jogo publicado ainda.</p>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        // FIREBASE CONFIGURAÇÃO (Com suas credenciais)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAInaNGj1eOcUMx2pOz2fqN45aWJG5vlzU",
+            authDomain: "bloxgo-5b38c.firebaseapp.com",
+            databaseURL: "https://bloxgo-5b38c-default-rtdb.firebaseio.com",
+            projectId: "bloxgo-5b38c",
+            storageBucket: "bloxgo-5b38c.firebasestorage.app",
+            messagingSenderId: "25582147646",
+            appId: "1:25582147646:web:879303822871092dbbd96f"
+        };
+        
+        let firebaseApp;
+        let db;
+        let allPublishedGames = [];
+        
+        // --- Funções do Editor 3D ---
+        let editorScene, editorCamera, editorRenderer, characterGroup;
+        let characterParts = {};
+        
+        // **IMPORTANTE:** Este DEFAULT_SKIN deve ser atualizado para as dimensões Roblox corrigidas 
+        // no seu arquivo player.html para garantir a consistência do visual salvo. 
+        // Deixo aqui o original para preservar a estrutura, mas o player.html depende do ajuste fino.
+        const DEFAULT_SKIN = { 
+            Head: { color: '#ffcc99', size: { x: 1.0, y: 1.0, z: 1.0 }, pos: { x: 0, y: 3.0, z: 0 } }, 
+            Torso: { color: '#007acc', size: { x: 1.0, y: 2.0, z: 0.5 }, pos: { x: 0, y: 2.0, z: 0 } }, 
+            'Left Arm': { color: '#ffcc99', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: -0.75, y: 2.0, z: 0 } }, 
+            'Right Arm': { color: '#ffcc99', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: 0.75, y: 2.0, z: 0 } }, 
+            'Left Leg': { color: '#1e1e1e', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: -0.25, y: 1.0, z: 0 } }, 
+            'Right Leg': { color: '#1e1e1e', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: 0.25, y: 1.0, z: 0 } }
+        };
+
+        // NOTA: Reverti o createCharacterModel para o estilo BoxGeometry simples para manter a compatibilidade
+        // com o seu design original de preview, mas usei as dimensões ajustadas.
+
+        function loadSavedSkin() { const savedS=localStorage.getItem('BloxGO_User_Skin'); const cS=JSON.parse(JSON.stringify(DEFAULT_SKIN)); if (savedS) { try { const sC=JSON.parse(savedS); for (const p in sC) { if (cS[p]) { cS[p].color = sC[p]; } } } catch (e) { console.error("Erro ao carregar skin do localStorage, usando padrão.", e); } } return cS; }
+        
+        function createCharacterModel(skinConfig) { 
+            if (characterGroup) editorScene.remove(characterGroup); 
+            const group = new THREE.Group(); 
+            
+            for (const name in skinConfig) { 
+                const config = skinConfig[name]; 
+                let geometry;
+
+                // CRÍTICO: Usa BoxGeometry para o preview, mas com as novas dimensões
+                if (name === 'Head') {
+                    // CILINDRO PARA HEAD (Preservando a correção visual no preview)
+                    const radius = config.size.x / 2; 
+                    const height = config.size.y;    
+                    geometry = new THREE.CylinderGeometry(radius, radius, height, 16); 
+                    geometry.translate(0, height / 2, 0); 
+                } else {
+                    geometry = new THREE.BoxGeometry(config.size.x, config.size.y, config.size.z);
+                }
+                
+                const material = new THREE.MeshStandardMaterial({ color: config.color }); 
+                const part = new THREE.Mesh(geometry, material); 
+                
+                // Ajuste de Posição (Y-positioning é o centro da malha)
+                part.position.set(config.pos.x, config.pos.y, config.pos.z); 
+                
+                part.castShadow = true; 
+                part.receiveShadow = true; 
+                part.userData.partName = name; 
+                characterParts[name] = part; 
+                group.add(part); 
+            } 
+            
+            group.rotation.y = Math.PI / 4; 
+            group.position.y = 0.5; 
+            return group; 
+        }
+        
+        function initCharacterEditor() { const canvas = document.getElementById('characterPreview'); const width = canvas.clientWidth; const height = canvas.clientHeight; editorScene = new THREE.Scene(); editorScene.background = new THREE.Color(0x2b2b2b); editorCamera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100); 
+            
+            // AJUSTE DE CÂMERA DO EDITOR para a nova escala
+            editorCamera.position.set(0, 3, 4.5); 
+            
+            editorRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); editorRenderer.setSize(width, height); editorRenderer.setPixelRatio(window.devicePixelRatio); editorRenderer.shadowMap.enabled = true; const ambient = new THREE.AmbientLight(0xffffff, 0.7); editorScene.add(ambient); const directional = new THREE.DirectionalLight(0xffffff, 0.5); directional.position.set(5, 10, 5); directional.castShadow = true; editorScene.add(directional); const currentSkin = loadSavedSkin(); characterGroup = createCharacterModel(currentSkin); editorScene.add(characterGroup); for (const name in currentSkin) { const color = currentSkin[name].color; const input = document.querySelector(`input[data-part='${name}']`); if (input) { input.value = color; } } animateEditor(); setupEditorListeners(); }
+        function animateEditor() { requestAnimationFrame(animateEditor); if (characterGroup) { characterGroup.rotation.y += 0.005; } editorRenderer.render(editorScene, editorCamera); }
+        function saveSkin() { const newColors = {}; const inputs = document.querySelectorAll('.customization-controls input[type="color"]'); inputs.forEach(input => { const partName = input.dataset.part; newColors[partName] = input.value; }); try { localStorage.setItem('BloxGO_User_Skin', JSON.stringify(newColors)); document.getElementById('skinStatus').textContent = 'Skin salva com sucesso!'; document.getElementById('skinStatus').style.color = '#4CAF50'; } catch (e) { document.getElementById('skinStatus').textContent = 'Erro ao salvar skin!'; document.getElementById('skinStatus').style.color = '#e51400'; } }
+        function updateCharacterColor(event) { const partName = event.target.dataset.part; const newColor = event.target.value; if (characterParts[partName]) { characterParts[partName].material.color.set(newColor); } clearTimeout(window.saveTimer); window.saveTimer = setTimeout(() => { saveSkin(); }, 1000); document.getElementById('skinStatus').textContent = 'Salvando...'; document.getElementById('skinStatus').style.color = '#ff9800'; }
+        function setupEditorListeners() { const inputs = document.querySelectorAll('.customization-controls input[type="color"]'); inputs.forEach(input => { input.addEventListener('input', updateCharacterColor); }); window.addEventListener('resize', onEditorResize); }
+        function onEditorResize() { const canvas = document.getElementById('characterPreview'); const width = canvas.clientWidth; const height = canvas.clientHeight; editorCamera.aspect = width / height; editorCamera.updateProjectionMatrix(); editorRenderer.setSize(width, height); }
+
+        function initFirebase() {
+            try {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                db = firebaseApp.database();
+            } catch(e) {
+                console.error("ERRO FIREBASE: Falha ao inicializar. A Home não poderá listar jogos online.", e);
+            }
+        }
+        
+        // --- FUNÇÕES DE CATEGORIZAÇÃO E BUSCA ---
+
+        function createGameCard(game) {
+            const gameCard = document.createElement('a');
+            gameCard.className = 'game-card';
+            // CRÍTICO: Garante que o ID é passado para o player
+            gameCard.href = `player.html?gameId=${game.id}`; 
+
+            const date = game.timestamp ? new Date(game.timestamp).toLocaleDateString('pt-BR') : 'Data Desconhecida';
+
+            gameCard.innerHTML = `
+                <h3>${game.gameName || 'Jogo sem nome'}</h3>
+                <p>Criador: ${game.ownerId || 'Desconhecido'}</p>
+                <p style="font-size: 10px; color: #888;">Publicado em: ${date}</p>
+                <p class="play-link">▶ CLIQUE PARA JOGAR</p>
+            `;
+            return gameCard;
+        }
+
+        function renderGames(games, containerId, limit = Infinity) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            if (!games || games.length === 0) {
+                container.innerHTML = `<p class="no-games-message">Nenhum jogo encontrado nesta categoria.</p>`;
+                return;
+            }
+
+            const gamesToRender = games.slice(0, limit);
+            gamesToRender.forEach(game => {
+                container.appendChild(createGameCard(game));
+            });
+        }
+        
+        function filterAndRenderGames(allGames, query = '') {
+            const sectionDestaques = document.getElementById('section-destaques');
+            const sectionRecomendacoes = document.getElementById('section-recomendacoes');
+            const sectionRecentes = document.getElementById('section-recentes');
+            const recentesTitle = sectionRecentes.querySelector('h1');
+
+            let filteredGames = allGames;
+            if (query.trim()) {
+                const lowerCaseQuery = query.toLowerCase().trim();
+                filteredGames = allGames.filter(game => 
+                    (game.gameName && game.gameName.toLowerCase().includes(lowerCaseQuery)) ||
+                    (game.ownerId && game.ownerId.toLowerCase().includes(lowerCaseQuery))
+                );
+                
+                sectionDestaques.style.display = 'none';
+                sectionRecomendacoes.style.display = 'none';
+                
+                recentesTitle.innerHTML = 
+                    filteredGames.length > 0 
+                        ? `🔎 Resultados da Busca para "${query}" (${filteredGames.length})`
+                        : `🔎 Nenhum Resultado encontrado para "${query}"`;
+            } else {
+                sectionDestaques.style.display = 'block';
+                sectionRecomendacoes.style.display = 'block';
+                recentesTitle.innerHTML = `⏱️ Jogos Recentes (Todos os Jogos)`;
+                
+                // CORREÇÃO CRÍTICA: Previne o erro "localeCompare on undefined"
+                filteredGames.sort((a, b) => {
+                    const idA = a.id ?? ''; 
+                    const idB = b.id ?? ''; 
+                    return idB.localeCompare(idA); // Ordena por ID decrescente (mais recente primeiro)
+                });
+            }
+
+            renderGames(filteredGames, 'list-recentes');
+            
+            if (!query.trim()) {
+                const sortedRecent = filteredGames; 
+                const featuredGames = sortedRecent.slice(0, 3);
+                renderGames(featuredGames, 'list-destaques');
+
+                const shuffledGames = allGames.slice().sort(() => 0.5 - Math.random());
+                const recommendedGames = shuffledGames.slice(0, 4);
+                renderGames(recommendedGames, 'list-recomendacoes');
+            }
+        }
+
+        function loadPublishedGames() {
+            if (!db) {
+                document.querySelectorAll('.games-list-container').forEach(container => {
+                    container.innerHTML = '<p class="no-games-message" style="color: red;">Erro de Conexão: Não foi possível carregar jogos do Firebase. Verifique as credenciais.</p>';
+                });
+                return;
+            }
+            
+            const gamesRef = db.ref('published_games');
+            
+            gamesRef.on('value', (snapshot) => {
+                const gamesObject = snapshot.val();
+                let gamesArray = [];
+
+                if (gamesObject) {
+                    // Mapeia os objetos do Firebase para um array e inclui o ID
+                    gamesArray = Object.keys(gamesObject).map(key => {
+                        const game = gamesObject[key];
+                        // CRÍTICO: Adiciona o ID ao objeto do jogo.
+                        game.id = key; 
+                        return game;
+                    });
+                }
+                
+                allPublishedGames = gamesArray;
+                filterAndRenderGames(allPublishedGames, document.getElementById('searchInput').value);
+                
+            }, (error) => {
+                console.error("ERRO ao ler jogos do Firebase:", error);
+                document.querySelectorAll('.games-list-container').forEach(container => {
+                    container.innerHTML = '<p class="no-games-message" style="color: red;">Erro de Leitura: Verifique se o Realtime Database está ativo e as regras estão em .read: true.</p>';
+                });
+            });
+        }
+
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            
+            function handleSearch() {
+                const query = searchInput.value;
+                filterAndRenderGames(allPublishedGames, query);
+            }
+
+            searchButton.addEventListener('click', handleSearch);
+            
+            searchInput.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+            loadPublishedGames();
+            setupSearch();
+            initCharacterEditor(); 
+        });
+    </script>
+</body>
+</html>

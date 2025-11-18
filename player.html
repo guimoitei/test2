@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BloxGO Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+
+    <style>
+        /* [ESTILOS CSS GERAIS] */
+        body { margin: 0; overflow: hidden; background: #1e1e1e; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        #gameCanvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        .loading-screen { 
+            position: absolute; 
+            z-index: 10; 
+            text-align: center; 
+            background: rgba(30, 30, 30, 0.9); 
+            width: 100%; 
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-screen h1 { color: #ffcc00; }
+        .back-button { position: absolute; top: 15px; left: 15px; padding: 10px; background: rgba(0, 0, 0, 0.5); color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 20; text-decoration: none; }
+        .game-ui { position: absolute; bottom: 15px; right: 15px; color: white; font-size: 14px; background: rgba(0, 0, 0, 0.5); padding: 8px 12px; border-radius: 5px; z-index: 20; }
+        .multiplayer-status { position: absolute; top: 15px; right: 15px; color: #fff; font-size: 14px; background: rgba(0, 0, 0, 0.7); padding: 5px 10px; border-radius: 5px; z-index: 20; }
+        
+        /* Estilos do Chat */
+        #chatContainer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 300px;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+        #chatDisplay {
+            flex-grow: 1;
+            overflow-y: auto;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+            font-size: 13px;
+        }
+        #chatInput {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            background: #222;
+            color: white;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+        .chat-name { font-weight: bold; color: #ffcc00; margin-right: 5px; }
+        
+        /* Estilos do Name Tag (HTML 3D) */
+        .name-tag {
+            position: absolute;
+            color: white;
+            font-size: 16px;
+            text-shadow: 1px 1px 2px black;
+            padding: 2px 5px;
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            transform: translate(-50%, -100%);
+        }
+        
+        /* Painel de Amizades */
+        #friendsPanel {
+            position: absolute;
+            top: 60px;
+            right: 15px;
+            width: 250px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 40;
+            display: none; 
+        }
+        #friendsPanel button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            background: #007acc;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        /* -------------------------------------- */
+        /* ESTILOS PARA CONTROLES VIRTUAIS */
+        /* -------------------------------------- */
+        #virtualControls {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            z-index: 60;
+            display: none; 
+        }
+        
+        .joystick-base {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            pointer-events: auto; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #moveJoystickBase {
+            bottom: 30px;
+            left: 30px;
+        }
+
+        .joystick-handle {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(0, 0);
+        }
+        
+        #jumpButton {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            background: #28a745;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            pointer-events: auto;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+            user-select: none;
+        }
+        
+        /* AJUSTES PARA TELAS PEQUENAS (MOBILE) */
+        @media (max-width: 600px) {
+            /* Força a exibição dos controles virtuais em telas pequenas */
+            #virtualControls {
+                display: block; 
+            }
+            
+            /* Otimiza a barra de status e o botão de voltar */
+            .back-button, .multiplayer-status {
+                top: 5px;
+                padding: 5px;
+                font-size: 12px;
+            }
+            .back-button { left: 5px; }
+            .multiplayer-status { right: 5px; }
+
+            /* Reposiciona o chat no topo e o reduz para telas pequenas */
+            #chatContainer {
+                top: 40px; 
+                bottom: auto; 
+                width: 90%; 
+                height: 150px; 
+                margin: 0 auto;
+                left: 5%;
+                right: 5%;
+                padding: 5px;
+            }
+            #chatInput {
+                padding: 5px;
+            }
+            
+            /* Esconde a UI desktop e o painel de amizades */
+            .game-ui, #friendsPanel {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="home.html" class="back-button">← Voltar para BloxGO Home</a>
+
+    <div class="loading-screen" id="loadingScreen">
+        <h1>Carregando Jogo...</h1>
+        <p id="loadingStatus">Conectando ao Firebase...</p>
+    </div>
+    
+    <div class="game-ui">
+        Use **W A S D** para mover e **Espaço** para pular.<br>Seu Nome: <span id="localPlayerNameDisplay">...</span>
+        <br><button onclick="toggleFriendsPanel()">Amizades</button>
+    </div>
+    <div class="multiplayer-status" id="multiplayerStatus">
+        Multiplayer: 🟡 Conectado ao Servidor...
+    </div>
+
+    <div id="friendsPanel">
+        <h3>Amizades</h3>
+        <p>Seu ID: <span id="localUserIDDisplay">...</span></p>
+        <hr style="border-color: #333;">
+        <input type="text" id="friendIDInput" placeholder="ID do jogador para adicionar" style="width: 100%; padding: 5px; box-sizing: border-box; background: #333; color: white; border: none;">
+        <button onclick="sendFriendRequest()">Enviar Pedido</button>
+        <div id="requestsList" style="margin-top: 10px; font-size: 13px;">
+            </div>
+    </div>
+
+    <div id="chatContainer">
+        <div id="chatDisplay"></div>
+        <input type="text" id="chatInput" placeholder="Pressione ENTER para enviar uma mensagem..." />
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="nameTagContainer"></div>
+
+    <div id="virtualControls">
+        <div id="moveJoystickBase" class="joystick-base">
+            <div id="moveJoystickHandle" class="joystick-handle"></div>
+        </div>
+        
+        <div id="jumpButton" ontouchstart="handleJumpStart()" ontouchend="handleJumpEnd()">PULO</div>
+    </div>
+
+
+    <script>
+        // FIREBASE CONFIGURAÇÃO 
+        const firebaseConfig = {
+            apiKey: "AIzaSyAInaNGj1eOcUMx2pOz2fqN45aWJG5vlzU",
+            authDomain: "bloxgo-5b38c.firebaseapp.com",
+            databaseURL: "https://bloxgo-5b38c-default-rtdb.firebaseio.com",
+            projectId: "bloxgo-5b38c",
+            storageBucket: "bloxgo-5b38c.firebasestorage.app",
+            messagingSenderId: "25582147646",
+            appId: "1:25582147646:web:879303822871092dbbd96f"
+        };
+        
+        let firebaseApp;
+        let db;
+        let localPlayerId;
+        let gameId;
+        let remotePlayers = {};
+        
+        let localPlayerName = "Jogador Desconhecido";
+        const nameTags = {}; 
+        
+        // --- ID PERSISTENTE ---
+        let globalUserID = localStorage.getItem('bloxgo_userID');
+        if (!globalUserID) {
+            globalUserID = 'user_' + Date.now() + Math.floor(Math.random() * 10000);
+            localStorage.setItem('bloxgo_userID', globalUserID);
+        }
+        document.getElementById('localUserIDDisplay').textContent = globalUserID;
+        localPlayerId = globalUserID; 
+        // -----------------------
+
+        // -----------------------------------------------------------------------
+        // VARIÁVEIS GLOBAIS E CONSTANTES
+        // -----------------------------------------------------------------------
+
+        let scene, camera, renderer;
+        let compiledScripts = new Map(); 
+        let lastUpdateTime = performance.now();
+        let player = null; 
+        let playerVelocity = new THREE.Vector3();
+        let keys = {}; 
+        
+        let playerVerticalVelocity = 0;
+        let isGrounded = false;
+        let playerIsMoving = false;
+        
+        // FÍSICA ESTÁVEL
+        const MOVE_SPEED = 0.15; 
+        const ROTATE_SPEED = 0.02;
+        const JUMP_VELOCITY = 0.5; 
+        const GRAVITY_FORCE = -0.05; 
+        
+        // CRÍTICO: COLISÃO (AJUSTE FINO)
+        const PLAYER_BOTTOM_Y = 1.75; 
+        const PLAYER_RADIUS = 0.5; 
+        const NAME_TAG_HEIGHT = 4.5;
+
+        // CRÍTICO: AJUSTE DA CÂMERA E CONTROLES
+        const CAMERA_OFFSET_DESKTOP = new THREE.Vector3(0, 3, 6); 
+        const CAMERA_OFFSET_MOBILE = new THREE.Vector3(0, 2.5, 7); 
+        let currentCameraOffset = CAMERA_OFFSET_DESKTOP;
+        let isMobileLayout = false; 
+
+        // VARIÁVEIS DO JOYSTICK
+        const MAX_JOYSTICK_DISTANCE = 30; 
+        let moveTouchId = -1; 
+        let moveJoystickCenter = { x: 0, y: 0 };
+        // Armazena a posição X anterior de toques para cálculo de delta da câmera
+        const touchXHistory = {}; 
+        
+        const vector = new THREE.Vector3(); 
+        const loader = new THREE.TextureLoader();
+        let collidableObjects = []; 
+        
+        // Texturas (URLs de Assets)
+        const FACE_TEXTURE_URL = './assets/face.png'; 
+        const BODY_TEXTURE_URL = './assets/body_texture.png'; 
+        let faceTexture;
+        let bodyTexture;
+
+        // CRÍTICO: DIMENSÕES ROBLOX
+        const DEFAULT_SKIN = {
+            Head: { name: 'Head', color: '#ffcc99', size: { x: 1.0, y: 1.0, z: 1.0 }, pos: { x: 0, y: 3.0, z: 0 } }, 
+            Torso: { name: 'Torso', color: '#007acc', size: { x: 1.0, y: 2.0, z: 0.5 }, pos: { x: 0, y: 2.0, z: 0 } }, 
+            'Right Arm': { name: 'Right Arm', color: '#ffcc99', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: -0.75, y: 2.0, z: 0 } },
+            'Left Arm': { name: 'Left Arm', color: '#ffcc99', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: 0.75, y: 2.0, z: 0 } },
+            'Right Leg': { name: 'Right Leg', color: '#333333', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: -0.25, y: 1.0, z: 0 } }, 
+            'Left Leg': { name: 'Left Leg', color: '#333333', size: { x: 0.5, y: 2.0, z: 0.5 }, pos: { x: 0.25, y: 1.0, z: 0 } } 
+        };
+        
+        // -----------------------------------------------------------------------
+        // FUNÇÃO DE DETECÇÃO DE LAYOUT E ADIÇÃO DE LISTENERS
+        // -----------------------------------------------------------------------
+
+        function detectDeviceAndSetLayout() {
+            isMobileLayout = window.innerWidth <= 600 || window.innerHeight <= 600;
+            const canvas = document.getElementById('gameCanvas');
+
+            if (isMobileLayout) {
+                currentCameraOffset = CAMERA_OFFSET_MOBILE;
+                document.getElementById('virtualControls').style.display = 'block';
+                
+                // Adiciona listeners ao CANVAS (para capturar toques que não são do joystick)
+                canvas.addEventListener('touchstart', handleTouchStart, false);
+                canvas.addEventListener('touchmove', handleTouchMove, false);
+                canvas.addEventListener('touchend', handleTouchEnd, false);
+
+                // Garante que o joystick center é calculado
+                calculateJoystickCenter();
+
+            } else {
+                currentCameraOffset = CAMERA_OFFSET_DESKTOP;
+                document.getElementById('virtualControls').style.display = 'none';
+                
+                // Remove listeners de toque no desktop
+                canvas.removeEventListener('touchstart', handleTouchStart, false);
+                canvas.removeEventListener('touchmove', handleTouchMove, false);
+                canvas.removeEventListener('touchend', handleTouchEnd, false);
+            }
+            
+            return false; 
+        }
+        
+        // -----------------------------------------------------------------------
+        // LÓGICA DO JOYSTICK E TOUCH DA CÂMERA (CORRIGIDA)
+        // -----------------------------------------------------------------------
+        
+        function calculateJoystickCenter() {
+             const base = document.getElementById('moveJoystickBase');
+             if (!base) return;
+             
+             // O centro precisa ser calculado a partir da posição da base na tela
+             const rect = base.getBoundingClientRect();
+             moveJoystickCenter = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+             };
+        }
+
+        function handleTouchStart(event) {
+            if (!player || !isMobileLayout) return;
+            
+            if (moveJoystickCenter.x === 0) {
+                 calculateJoystickCenter();
+            }
+
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const touch = event.changedTouches[i];
+                const touchX = touch.clientX;
+                const canvasWidth = window.innerWidth;
+                const baseRect = document.getElementById('moveJoystickBase').getBoundingClientRect();
+                
+                // 1. Inicia o Joystick de Movimento (Metade Esquerda, DENTRO da Base)
+                if (moveTouchId === -1 && 
+                    touch.clientX >= baseRect.left && touch.clientX <= baseRect.right &&
+                    touch.clientY >= baseRect.top && touch.clientY <= baseRect.bottom) 
+                {
+                    moveTouchId = touch.identifier;
+                    document.getElementById('moveJoystickHandle').style.transform = `translate(0px, 0px)`;
+                } 
+                
+                // 2. Inicia o Histórico para Rotação da Câmera (Qualquer lugar, exceto o Joystick)
+                if (touch.identifier !== moveTouchId && touchX > canvasWidth / 2) {
+                     touchXHistory[touch.identifier] = touchX;
+                }
+            }
+        }
+
+        function handleTouchMove(event) {
+            if (!player || !isMobileLayout) return;
+            event.preventDefault(); 
+            
+            const canvasWidth = window.innerWidth;
+
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const touch = event.changedTouches[i];
+                const touchX = touch.clientX;
+
+                // --- 1. Joystick de Movimento ---
+                if (touch.identifier === moveTouchId) {
+                    const dx = touch.clientX - moveJoystickCenter.x;
+                    const dy = touch.clientY - moveJoystickCenter.y;
+                    let distance = Math.min(Math.sqrt(dx * dx + dy * dy), MAX_JOYSTICK_DISTANCE);
+                    let angle = Math.atan2(dy, dx);
+                    
+                    const limitedX = Math.cos(angle) * distance;
+                    const limitedY = Math.sin(angle) * distance;
+
+                    document.getElementById('moveJoystickHandle').style.transform = `translate(${limitedX}px, ${limitedY}px)`;
+                    
+                    const normalizedX = limitedX / MAX_JOYSTICK_DISTANCE; 
+                    const normalizedY = limitedY / MAX_JOYSTICK_DISTANCE; 
+
+                    keys['W'] = normalizedY < -0.1; 
+                    keys['S'] = normalizedY > 0.1; 
+
+                    // CRÍTICO: Aplica rotação direta ao player se houver movimento horizontal no stick
+                    if (Math.abs(normalizedX) > 0.1) {
+                         player.rotation.y -= normalizedX * ROTATE_SPEED * 15; 
+                    } else {
+                         keys['A'] = keys['D'] = false; // Garante que as teclas A/D do stick estão desligadas se o stick estiver centralizado
+                    }
+                } 
+                
+                // --- 2. Rotação da Câmera (Metade Direita) ---
+                else if (touchXHistory[touch.identifier] !== undefined) {
+                    const prevX = touchXHistory[touch.identifier];
+                    const deltaX = touchX - prevX;
+                    
+                    if (Math.abs(deltaX) > 1) { // Verifica se houve movimento real
+                         player.rotation.y -= deltaX * ROTATE_SPEED * 0.5; // Ajuste de sensibilidade
+                    }
+                    
+                    // Atualiza o histórico para o próximo frame
+                    touchXHistory[touch.identifier] = touchX;
+                }
+            }
+        }
+
+        function handleTouchEnd(event) {
+            if (!player || !isMobileLayout) return;
+            
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const touch = event.changedTouches[i];
+
+                if (touch.identifier === moveTouchId) {
+                    // Reset do Joystick
+                    moveTouchId = -1;
+                    document.getElementById('moveJoystickHandle').style.transform = `translate(0px, 0px)`;
+                    keys['W'] = keys['S'] = keys['A'] = keys['D'] = false;
+                }
+                
+                // Limpa o histórico de toques da câmera
+                delete touchXHistory[touch.identifier];
+            }
+        }
+        
+        function handleJumpStart() {
+            if (isGrounded) { 
+                playerVerticalVelocity = JUMP_VELOCITY; 
+                isGrounded = false; 
+            }
+        }
+        
+        function handleJumpEnd() { }
+
+        // -----------------------------------------------------------------------
+        // FUNÇÕES DE INICIALIZAÇÃO E CARREGAMENTO
+        // -----------------------------------------------------------------------
+
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            var results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+
+        function getPlayerName() {
+            let name = localStorage.getItem('BloxGO_Player_Name');
+            if (!name) {
+                name = prompt("Qual é o seu nome de jogador? (Será exibido para todos)", "Jogador" + Math.floor(Math.random() * 100));
+                if (!name || name.trim() === "") {
+                     name = "Jogador Anônimo";
+                }
+                localStorage.setItem('BloxGO_Player_Name', name.trim());
+            }
+            localPlayerName = name.trim();
+            document.getElementById('localPlayerNameDisplay').textContent = localPlayerName;
+        }
+
+        function createTricMaterial(color) {
+            return new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.1 });
+        }
+        
+        function loadTextures(callback) {
+            let texturesLoaded = 0;
+            const totalTextures = 2;
+
+            function onTextureLoad() {
+                texturesLoaded++;
+                if (texturesLoaded === totalTextures && callback) {
+                    callback();
+                }
+            }
+
+            loader.load(FACE_TEXTURE_URL, 
+                (texture) => { faceTexture = texture; onTextureLoad(); }, 
+                undefined, 
+                (err) => { console.warn('Erro ao carregar textura do rosto:', err); faceTexture = null; onTextureLoad(); }
+            );
+
+            loader.load(BODY_TEXTURE_URL, 
+                (texture) => { bodyTexture = texture; onTextureLoad(); }, 
+                undefined, 
+                (err) => { console.warn('Erro ao carregar textura do corpo:', err); bodyTexture = null; onTextureLoad(); }
+            );
+        }
+
+        function loadSavedSkin() { 
+            const savedSkinJSON = localStorage.getItem('BloxGO_User_Skin'); 
+            const currentSkinConfig = JSON.parse(JSON.stringify(DEFAULT_SKIN)); 
+            
+            if (savedSkinJSON) { 
+                try { 
+                    const savedColors = JSON.parse(savedSkinJSON); 
+                    for (const partName in savedColors) { 
+                        if (currentSkinConfig[partName]) { 
+                            currentSkinConfig[partName].color = savedColors[partName]; 
+                        } 
+                    } 
+                } catch (e) { 
+                    console.error("Erro ao carregar skin do localStorage, usando padrão.", e); 
+                } 
+            } 
+            return currentSkinConfig; 
+        }
+
+        function createCharacterModel(skinConfig, isRemote = false) {
+            const characterGroup = new THREE.Group();
+            characterGroup.name = isRemote ? "RemotePlayer" : "LocalPlayer";
+            
+            for (const name in skinConfig) {
+                const config = skinConfig[name];
+                
+                let geometry;
+                let material;
+                const baseColor = new THREE.Color(config.color);
+
+                if (name === 'Head') {
+                    const radius = config.size.x / 2; 
+                    const height = config.size.y;    
+                    geometry = new THREE.CylinderGeometry(radius, radius, height, 16); 
+                    geometry.translate(0, height / 2, 0); 
+                    
+                    const defaultMat = new THREE.MeshStandardMaterial({ color: baseColor });
+                    const faceMat = new THREE.MeshStandardMaterial({ map: faceTexture || undefined, color: baseColor });
+
+                    const materials = [defaultMat.clone(), defaultMat.clone()];
+                    for (let i = 0; i < 16; i++) {
+                        if (i === 0) { materials.push(faceMat.clone()); } else { materials.push(defaultMat.clone()); }
+                    }
+                    material = materials;
+                    
+                } else {
+                    geometry = new THREE.BoxGeometry(config.size.x, config.size.y, config.size.z);
+                    
+                    if ((name.includes('Arm') || name === 'Torso') && bodyTexture) {
+                        material = new THREE.MeshStandardMaterial({ map: bodyTexture, color: baseColor });
+                    } else {
+                        material = new THREE.MeshStandardMaterial({ color: baseColor });
+                    }
+                }
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.name = config.name; 
+                
+                mesh.position.set(config.pos.x, config.pos.y, config.pos.z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                characterGroup.add(mesh);
+            }
+
+            characterGroup.userData.isRemote = isRemote;
+            return characterGroup;
+        }
+
+        function reconstructScene(sceneObjects) {
+            collidableObjects = [];
+            compiledScripts.clear(); 
+            
+            if (!Array.isArray(sceneObjects)) {
+                console.error("ERRO CRÍTICO: sceneObjects não é um array.");
+                return;
+            }
+
+            sceneObjects.forEach(data => {
+                try {
+                    let geometry, mesh;
+                    const colorHex = data.color ? parseInt(data.color.replace('#', '0x')) : 0xffffff;
+                    const material = createTricMaterial(colorHex);
+                    
+                    if (data.type === "Ground") {
+                        geometry = new THREE.PlaneGeometry(500, 500);
+                        const groundMaterial = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.8, metalness: 0.1, side: THREE.DoubleSide });
+                        mesh = new THREE.Mesh(geometry, groundMaterial);
+                        mesh.rotation.x = -Math.PI / 2;
+                        mesh.receiveShadow = true;
+                        
+                        const pos = data.position || {};
+                        mesh.position.set(parseFloat(pos.x) || 0, 0, parseFloat(pos.z) || 0); 
+                        
+                    } else {
+                        switch(data.type) {
+                            case 'cube': geometry = new THREE.BoxGeometry(2, 2, 2); break;
+                            case 'sphere': geometry = new THREE.SphereGeometry(1, 32, 32); break;
+                            case 'cylinder': geometry = new THREE.CylinderGeometry(1, 1, 2, 32); geometry.translate(0, 1, 0); break;
+                            default: geometry = new THREE.BoxGeometry(2, 2, 2);
+                        }
+                        mesh = new THREE.Mesh(geometry, material);
+
+                        const pos = data.position || {};
+                        const rot = data.rotation || {};
+                        const scale = data.scale || {};
+
+                        mesh.position.set(parseFloat(pos.x) || 0, parseFloat(pos.y) || 0, parseFloat(pos.z) || 0);
+                        mesh.rotation.set(parseFloat(rot.x) || 0, parseFloat(rot.y) || 0, parseFloat(rot.z) || 0);
+                        mesh.scale.set(parseFloat(scale.x) || 1, parseFloat(scale.y) || 1, parseFloat(scale.z) || 1);
+                        
+                        mesh.receiveShadow = true;
+                        mesh.castShadow = true;
+                        
+                        collidableObjects.push(mesh);
+                    }
+                    if(mesh) { 
+                        mesh.userData.type = data.type; 
+                        mesh.userData.script = data.script; 
+                        scene.add(mesh);
+
+                        if (data.script && data.script.trim() !== '') {
+                            try {
+                                const scriptFunction = new Function('time', 'delta', `
+                                    const self = this;
+                                    with(self) {
+                                        ${data.script}
+                                    }
+                                `);
+                                compiledScripts.set(mesh.uuid, scriptFunction.bind(mesh)); 
+                            } catch (error) {
+                                console.error(`Erro ao compilar script para ${data.name}:`, error);
+                            }
+                        }
+                    }
+
+                } catch (error) {
+                    console.error(`Erro ao criar objeto 3D:`, error);
+                }
+            });
+        }
+
+        function initFirebase(gameId) {
+            try {
+                if (firebase.apps.length === 0) { firebaseApp = firebase.initializeApp(firebaseConfig); } else { firebaseApp = firebase.app(); }
+                db = firebaseApp.database();
+                document.getElementById('multiplayerStatus').textContent = 'Multiplayer: 🟢 Conectado ao Servidor!';
+                setupRemotePlayerListener(gameId); 
+                setupChatListener(gameId); 
+            } catch(e) {
+                document.getElementById('multiplayerStatus').textContent = 'Multiplayer: 🔴 Falha na conexão Firebase!';
+                console.error("Firebase Initialization Error:", e);
+            }
+        }
+
+        function loadAndRunGame() {
+            const statusElement = document.getElementById('loadingStatus');
+            
+            // O BLOQUEIO DE SITE FOI REMOVIDO TEMPORARIAMENTE
+            // O detectDeviceAndSetLayout() permanece para ajustar a câmera e o layout
+            detectDeviceAndSetLayout();
+
+            gameId = getUrlParameter('gameId');
+            getPlayerName(); 
+
+            if (!gameId) {
+                statusElement.textContent = "ERRO: ID do jogo não fornecido na URL. Retorne para a Home.";
+                return;
+            }
+            
+            initFirebase(gameId); 
+
+            loadTextures(() => {
+                db.ref('games/' + gameId).once('value')
+                    .then((snapshot) => {
+                        const gameData = snapshot.val();
+                        
+                        if (!gameData) {
+                            statusElement.textContent = `Erro: Jogo com ID ${gameId} não encontrado.`;
+                            return;
+                        }
+                        
+                        initPlayer(gameData);
+                        statusElement.textContent = `Carregando: ${gameData.gameName}...`;
+                    })
+                    .catch((error) => {
+                        statusElement.textContent = "Erro ao carregar o mundo do jogo do Firebase.";
+                        console.error("ERRO FIREBASE:", error);
+                    });
+            });
+        }
+
+        function initPlayer(gameData) {
+            const canvas = document.getElementById('gameCanvas');
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            scene = new THREE.Scene();
+            const skyColor = 0x87ceeb; 
+            scene.background = new THREE.Color(skyColor);
+            scene.fog = new THREE.Fog(0x1e1e1e, 50, 200);
+
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(width, height);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+            
+            document.title = gameData.gameName + " - BloxGO Player";
+
+            scene.add(new THREE.AmbientLight(0x606060));
+            const light = new THREE.DirectionalLight(0xffffff, 0.8);
+            light.position.set(50, 100, 50);
+            light.castShadow = true;
+            scene.add(light);
+
+            reconstructScene(gameData.sceneObjects);
+            
+            const skinConfig = loadSavedSkin(); 
+            player = createCharacterModel(skinConfig, false); 
+            
+            player.position.set(0, PLAYER_BOTTOM_Y, 0); 
+            scene.add(player);
+            
+            camera.position.copy(player.position).add(currentCameraOffset); 
+            camera.lookAt(player.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+            
+            setupPlayerControls();
+            setupChatInput();
+
+            document.getElementById('loadingScreen').style.display = 'none';
+            window.addEventListener('resize', onWindowResize);
+            
+            saveLocalPlayerState(true);
+            
+            animate();
+        }
+
+        // ----------------------------------------------------------------
+        // FUNÇÕES DE FÍSICA, MOVIMENTO E LOOP
+        // ----------------------------------------------------------------
+        
+        function updatePlayerMovement(delta) {
+            if (!player) return;
+            
+            const oldPositionX = player.position.x;
+            const oldPositionZ = player.position.z;
+            
+            // Rotação do teclado (só funciona no desktop)
+            if (!isMobileLayout) {
+                 if (keys['A']) { player.rotation.y += ROTATE_SPEED; }
+                 if (keys['D']) { player.rotation.y -= ROTATE_SPEED; }
+            }
+            
+            const moveVector = new THREE.Vector3(0, 0, 0);
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion);
+            
+            if (keys['W']) { moveVector.addScaledVector(forward, MOVE_SPEED); }
+            if (keys['S']) { moveVector.addScaledVector(forward, -MOVE_SPEED); }
+
+            if (moveVector.lengthSq() > 0) {
+                const raycaster = new THREE.Raycaster();
+                const rayOrigins = [player.position.clone().add(new THREE.Vector3(0, 0, 0))];
+                const rayDirection = moveVector.clone().normalize();
+                let collisionDetected = false;
+
+                for(const origin of rayOrigins) {
+                    raycaster.set(origin, rayDirection);
+                    raycaster.far = PLAYER_RADIUS + MOVE_SPEED; 
+                    const intersections = raycaster.intersectObjects(collidableObjects, true);
+
+                    if (intersections.length > 0 && intersections[0].distance < PLAYER_RADIUS) {
+                        collisionDetected = true;
+                        break;
+                    }
+                }
+
+                if (collisionDetected) {
+                    moveVector.set(0, 0, 0);
+                }
+            }
+
+            player.position.x += moveVector.x;
+            player.position.z += moveVector.z;
+            
+            playerVerticalVelocity += GRAVITY_FORCE;
+            player.position.y += playerVerticalVelocity;
+
+            if (player.position.y < PLAYER_BOTTOM_Y) {
+                player.position.y = PLAYER_BOTTOM_Y; 
+                playerVerticalVelocity = 0;
+                isGrounded = true;
+            }
+
+            playerIsMoving = player.position.x !== oldPositionX || player.position.z !== oldPositionZ;
+            camera.position.copy(player.position).add(currentCameraOffset.clone().applyQuaternion(player.quaternion));
+            camera.lookAt(player.position.clone().add(new THREE.Vector3(0, 1.5, 0))); 
+            
+            saveLocalPlayerState();
+        }
+        
+        function runGameScripts() {
+            if (!player) return;
+
+            const currentTime = performance.now();
+            const delta = (currentTime - lastUpdateTime) / 1000;
+            lastUpdateTime = currentTime;
+
+            for (const [uuid, scriptFunction] of compiledScripts.entries()) {
+                scriptFunction(currentTime, delta); 
+            }
+            
+            updatePlayerMovement(delta);
+            animateLimbs(currentTime / 100); 
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (scene && camera && renderer) {
+                runGameScripts();
+                updateNameTagsPosition();
+                renderer.render(scene, camera);
+            }
+        }
+        
+        // ----------------------------------------------------------------
+        // OUTRAS FUNÇÕES (Controles, Resize, Multiplayer, etc.)
+        // ----------------------------------------------------------------
+        
+        function updateNameTagsPosition() {
+            if (!camera || !player || !renderer) return;
+
+            const tagContainer = document.getElementById('nameTagContainer');
+            if (!tagContainer) return;
+            
+            for (const playerId in nameTags) {
+                const tag = nameTags[playerId];
+                const target = tag.userData.targetObject;
+                
+                if (target && tag && target.isObject3D) { 
+                    target.getWorldPosition(vector);
+                    vector.y += NAME_TAG_HEIGHT; 
+                    
+                    vector.project(camera); 
+                    
+                    const width = window.innerWidth;
+                    const height = window.innerHeight;
+                    
+                    const x = (vector.x * 0.5 + 0.5) * width;
+                    const y = (-vector.y * 0.5 + 0.5) * height;
+                    
+                    tag.style.left = `${x}px`;
+                    tag.style.top = `${y}px`;
+                    
+                    const distance = player.position.distanceTo(target.position);
+                    tag.style.opacity = (distance > 50) ? 0.3 : 1;
+                } else if (tag) {
+                     tag.style.opacity = 0;
+                }
+            }
+        }
+        
+        function animateLimbs(time) {
+            if (!player) return;
+
+            const leftArm = player.children.find(c => c.name === 'Left Arm');
+            const rightArm = player.children.find(c => c.name === 'Right Arm');
+            const leftLeg = player.children.find(c => c.name === 'Left Leg');
+            const rightLeg = player.children.find(c => c.name === 'Right Leg');
+            
+            const swing = Math.sin(time / 8) * 0.5;
+            const idle_swing = Math.sin(time / 20) * 0.05;
+
+            if (playerIsMoving && isGrounded) {
+                if (leftArm) leftArm.rotation.x = swing; if (rightArm) rightArm.rotation.x = -swing;
+                if (leftLeg) leftLeg.rotation.x = -swing; if (rightLeg) rightLeg.rotation.x = swing;
+            } else {
+                if (leftArm) leftArm.rotation.x = idle_swing; if (rightArm) rightArm.rotation.x = -idle_swing;
+                if (leftLeg) leftLeg.rotation.x = 0; if (rightLeg) rightLeg.rotation.x = 0;
+            }
+        }
+
+        function setupPlayerControls() {
+            document.addEventListener('keydown', (event) => {
+                keys[event.key.toUpperCase()] = true;
+                if (event.code === 'Space' && isGrounded) { playerVerticalVelocity = JUMP_VELOCITY; isGrounded = false; }
+            });
+            document.addEventListener('keyup', (event) => { keys[event.key.toUpperCase()] = false; });
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            detectDeviceAndSetLayout(); 
+        }
+
+        // --- Funções Multiplayer/Chat (Lógica Completa) ---
+
+        function saveLocalPlayerState(isInitial = false) {
+            if (!db || !player) return;
+
+            const playerRef = db.ref(`games/${gameId}/players/${localPlayerId}`);
+            
+            const state = {
+                name: localPlayerName,
+                position: { 
+                    x: player.position.x.toFixed(3), 
+                    y: player.position.y.toFixed(3), 
+                    z: player.position.z.toFixed(3) 
+                },
+                rotation: { 
+                    y: player.rotation.y.toFixed(3) 
+                },
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            if (isInitial) {
+                playerRef.set(state);
+                playerRef.onDisconnect().remove();
+            } else if (playerIsMoving || isGrounded === false) {
+                playerRef.update(state); 
+            }
+        }
+
+        function updateNameTag(playerId, name, object) {
+            const container = document.getElementById('nameTagContainer');
+            let tag = nameTags[playerId];
+
+            if (!tag) {
+                tag = document.createElement('div');
+                tag.className = 'name-tag';
+                tag.id = `name-tag-${playerId}`;
+                container.appendChild(tag);
+                nameTags[playerId] = tag;
+                tag.userData.targetObject = object; 
+            }
+
+            tag.textContent = name;
+        }
+
+        function updateRemotePlayer(playerId, data) {
+            let remotePlayer = remotePlayers[playerId];
+
+            if (!remotePlayer) {
+                remotePlayer = createCharacterModel(DEFAULT_SKIN, true); 
+                remotePlayer.userData.playerName = data.name;
+                scene.add(remotePlayer);
+                remotePlayers[playerId] = remotePlayer;
+                updateNameTag(playerId, data.name, remotePlayer);
+            }
+
+            remotePlayer.position.set(parseFloat(data.position.x), parseFloat(data.position.y), parseFloat(data.position.z));
+            remotePlayer.rotation.y = parseFloat(data.rotation.y);
+        }
+
+        function setupRemotePlayerListener(gameId) {
+            const playersRef = db.ref(`games/${gameId}/players`);
+
+            playersRef.on('child_changed', (snapshot) => {
+                const playerId = snapshot.key;
+                const data = snapshot.val();
+                if (playerId !== localPlayerId) {
+                    updateRemotePlayer(playerId, data);
+                }
+            });
+            
+            playersRef.on('child_added', (snapshot) => {
+                 const playerId = snapshot.key;
+                 const data = snapshot.val();
+                 if (playerId !== localPlayerId) {
+                    updateRemotePlayer(playerId, data);
+                 }
+            });
+
+            playersRef.on('child_removed', (snapshot) => {
+                const playerId = snapshot.key;
+                if (remotePlayers[playerId]) {
+                    scene.remove(remotePlayers[playerId]);
+                    delete remotePlayers[playerId];
+                }
+                if (nameTags[playerId]) {
+                    nameTags[playerId].remove();
+                    delete nameTags[playerId];
+                }
+            });
+        }
+
+        function displayMessage(name, text) {
+            const chatDisplay = document.getElementById('chatDisplay');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'chat-message';
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'chat-name';
+            nameSpan.textContent = `${name}: `;
+            
+            messageElement.appendChild(nameSpan);
+            messageElement.appendChild(document.createTextNode(text));
+            
+            chatDisplay.appendChild(messageElement);
+            chatDisplay.scrollTop = chatDisplay.scrollHeight;
+        }
+
+        function sendChatMessage(text) {
+            if (!db || !gameId || text.trim() === "") return;
+            
+            const chatRef = db.ref(`games/${gameId}/chat`);
+            const message = text.trim();
+
+            chatRef.push({
+                senderId: localPlayerId,
+                senderName: localPlayerName,
+                message: message,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+        }
+
+        function setupChatInput() {
+            const chatInput = document.getElementById('chatInput');
+            chatInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault(); 
+                    sendChatMessage(chatInput.value);
+                    chatInput.value = '';
+                }
+            });
+        }
+
+        function setupChatListener(gameId) {
+            if (!db || !gameId) return;
+
+            const chatRef = db.ref(`games/${gameId}/chat`).limitToLast(50);
+            chatRef.on('child_added', (snapshot) => {
+                const messageData = snapshot.val();
+                displayMessage(messageData.senderName, messageData.message);
+            });
+        }
+
+        function toggleFriendsPanel() {
+            const panel = document.getElementById('friendsPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function sendFriendRequest() {
+            const friendID = document.getElementById('friendIDInput').value.trim();
+            if (friendID && friendID !== globalUserID) {
+                alert(`Pedido de amizade enviado para: ${friendID}. (Funcionalidade de back-end não implementada)`);
+                document.getElementById('friendIDInput').value = '';
+            } else {
+                alert("ID inválido ou seu próprio ID.");
+            }
+        }
+
+        function acceptFriendRequest(senderID) {
+            alert(`Amizade com ${senderID} aceita! (Funcionalidade de back-end não implementada)`);
+        }
+
+        // ----------------------------------------------------------------
+        // INÍCIO DO PROGRAMA
+        // ----------------------------------------------------------------
+        window.addEventListener('load', loadAndRunGame);
+    </script>
+</body>
+</html>
